@@ -1,16 +1,31 @@
 from itertools import count
 
-from flask import Flask, abort, request, url_for
+from flask import Flask, abort, g, request, url_for
 from werkzeug.exceptions import HTTPException
 
 app = Flask(__name__)
 
+# Placeholder authentication only; replace with real users and token verification.
+DEMO_USERNAME = "demo"
+DEMO_PASSWORD = "demo"
+DEMO_TOKEN = "demo-token"
+
+
+@app.before_request
+def require_login():
+    """Protect matched routes, except login and automatic OPTIONS requests."""
+    if request.endpoint is None or request.endpoint == "login" or request.method == "OPTIONS":
+        return
+    if request.headers.get("Authorization") != f"Bearer {DEMO_TOKEN}":
+        abort(401, description="Log in and provide Authorization: Bearer <token>.")
+    g.user = {"username": DEMO_USERNAME}
+
 
 @app.before_request
 def require_json():
-    """Run before matched item writes to check the request body."""
+    """Check JSON bodies for login and item writes."""
     if (
-        request.endpoint in {"create_item", "replace_item"}
+        request.endpoint in {"login", "create_item", "replace_item"}
         and request.method in {"POST", "PUT"}
     ):
         if not request.is_json:
@@ -31,6 +46,17 @@ def json_error(error):
 # Demo storage: resets whenever the server restarts.
 items = {1: {"id": 1, "name": "Apple"}}
 item_ids = count(2)
+
+
+@app.post("/login")
+def login():
+    credentials = request.get_json()
+    if (
+        credentials.get("username") != DEMO_USERNAME
+        or credentials.get("password") != DEMO_PASSWORD
+    ):
+        abort(401, description="Invalid username or password.")
+    return {"access_token": DEMO_TOKEN, "token_type": "Bearer"}
 
 
 def read_name():
